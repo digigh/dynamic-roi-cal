@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dynamic ROI Model</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Bebas+Neue&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #080810;
+  --surface: #0e0e1a;
+  --surface2: #14141f;
+  --surface3: #1a1a28;
+  --border: rgba(150,140,255,0.1);
+  --border2: rgba(150,140,255,0.2);
+  --text: #eeeaf8;
+  --muted: #6e6a8a;
+  --muted2: #9a96b8;
+  --accent: #7c6dfa;
+  --accent-glow: rgba(124,109,250,0.35);
+  --lime: #b8ff57;
+  --lime-glow: rgba(184,255,87,0.2);
+  --min-c: #ff6b6b;
+  --med-c: #7c6dfa;
+  --max-c: #57ffb8;
+  --off-bg: rgba(255,255,255,0.03);
+  --off-text: rgba(150,140,200,0.3);
+  --font-display: 'Bebas Neue', sans-serif;
+  --font-body: 'Space Grotesk', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Grid bg */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(124,109,250,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124,109,250,0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none; z-index: 0;
+}
+
+/* Orb glow */
+body::after {
+  content: '';
+  position: fixed;
+  top: -200px; left: -200px;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(124,109,250,0.12) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+}
+
+/* ── HEADER ── */
+header {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(8,8,16,0.88);
+  backdrop-filter: blur(24px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 2rem;
+  height: 56px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+.logo {
+  font-family: var(--font-display);
+  font-size: 22px;
+  letter-spacing: .12em;
+  color: var(--text);
+  display: flex; align-items: center; gap: 10px;
+}
+
+.logo-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  background: var(--accent);
+  color: #fff;
+  padding: 2px 7px;
+  border-radius: 3px;
+  letter-spacing: .08em;
+}
+
+.header-right {
+  display: flex; align-items: center; gap: 16px;
+}
+
+.live-dot {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px; color: var(--lime);
+  letter-spacing: .1em;
+}
+
+.live-dot::before {
+  content: '';
+  width: 6px; height: 6px;
+  background: var(--lime);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--lime);
+  animation: blink 1.4s ease-in-out infinite;
+}
+
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* ── HERO ── */
+.hero {
+  padding: 3rem 2rem 1.5rem;
+  position: relative; z-index: 1;
+  border-bottom: 1px solid var(--border);
+}
+
+.hero-inner {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 2rem;
+}
+
+.hero h1 {
+  font-family: var(--font-display);
+  font-size: clamp(3.5rem, 7vw, 6.5rem);
+  line-height: .92;
+  letter-spacing: .04em;
+  color: var(--text);
+}
+
+.hero h1 em {
+  font-style: normal;
+  color: var(--lime);
+  text-shadow: 0 0 40px var(--lime-glow);
+}
+
+.hero-meta {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.hero-tag {
+  font-family: var(--font-mono);
+  font-size: 10px; color: var(--muted);
+  letter-spacing: .2em; text-transform: uppercase;
+  margin-bottom: .5rem;
+}
+
+.hero-desc {
+  font-size: 12px; color: var(--muted2);
+  line-height: 1.7; max-width: 280px;
+  text-align: right;
+}
+
+/* ── LAYOUT ── */
+.main {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  position: relative; z-index: 1;
+  min-height: calc(100vh - 200px);
+}
+
+/* ── INPUTS PANEL ── */
+.inputs-panel {
+  border-right: 1px solid var(--border);
+  padding: 1.5rem 1.5rem 3rem;
+  position: sticky; top: 56px;
+  height: calc(100vh - 56px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border2) transparent;
+}
+
+.inputs-panel::-webkit-scrollbar { width: 3px; }
+.inputs-panel::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.sec-head {
+  font-family: var(--font-display);
+  font-size: 16px;
+  letter-spacing: .12em;
+  color: var(--muted2);
+  margin: 1.25rem 0 .75rem;
+  display: flex; align-items: center; gap: 10px;
+}
+
+.sec-head::after {
+  content: ''; flex: 1; height: 1px;
+  background: linear-gradient(90deg, var(--border2), transparent);
+}
+
+/* ── INPUT ITEM WITH TOGGLE ── */
+.input-item {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 0;
+  transition: opacity .25s;
+}
+
+.input-item:last-child { border-bottom: none; }
+
+.input-item.off {
+  opacity: .35;
+}
+
+.input-item.off .slider-wrap { pointer-events: none; }
+
+.input-top {
+  display: flex; align-items: center;
+  gap: 8px; margin-bottom: 6px;
+}
+
+/* TOGGLE SWITCH */
+.toggle {
+  position: relative;
+  width: 28px; height: 15px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.toggle input { display: none; }
+
+.toggle-track {
+  position: absolute; inset: 0;
+  background: var(--surface3);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  transition: background .2s, border-color .2s;
+}
+
+.toggle input:checked ~ .toggle-track {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
+.toggle-thumb {
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 9px; height: 9px;
+  background: var(--muted);
+  border-radius: 50%;
+  transition: transform .2s, background .2s;
+}
+
+.toggle input:checked ~ .toggle-thumb {
+  transform: translateX(13px);
+  background: #fff;
+}
+
+.input-name {
+  font-size: 11px; color: var(--muted2);
+  font-weight: 400; letter-spacing: .02em;
+  flex: 1;
+}
+
+.input-display {
+  font-family: var(--font-mono);
+  font-size: 12px; font-weight: 500;
+  color: var(--lime);
+  font-variant-numeric: tabular-nums;
+  min-width: 72px; text-align: right;
+}
+
+.input-item.off .input-display {
+  color: var(--muted);
+}
+
+.slider-wrap { padding: 0 2px; }
+
+input[type=range] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 2px;
+  background: var(--surface3);
+  border-radius: 1px; outline: none; cursor: pointer;
+}
+
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 13px; height: 13px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 8px var(--accent-glow);
+  transition: transform .15s;
+}
+
+input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.4); }
+input[type=range]::-moz-range-thumb {
+  width: 13px; height: 13px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+}
+
+/* CONVERSION RATES */
+.cr-grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px; margin-bottom: 1rem;
+}
+
+.cr-box {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 8px;
+  text-align: center;
+  transition: border-color .2s, opacity .25s;
+  position: relative;
+}
+
+.cr-box.off { opacity: .3; pointer-events: none; }
+
+.cr-box label {
+  font-family: var(--font-mono);
+  font-size: 8px; letter-spacing: .15em;
+  text-transform: uppercase;
+  display: block; margin-bottom: 6px;
+}
+
+.cr-box.min label { color: var(--min-c); }
+.cr-box.med label { color: var(--med-c); }
+.cr-box.max label { color: var(--max-c); }
+
+.cr-box.min { border-color: rgba(255,107,107,0.2); }
+.cr-box.med { border-color: rgba(124,109,250,0.3); }
+.cr-box.max { border-color: rgba(87,255,184,0.2); }
+
+.cr-box input[type=number] {
+  background: transparent; border: none; outline: none;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 20px; font-weight: 700;
+  width: 100%; text-align: center;
+}
+
+.cr-pct { font-family: var(--font-mono); font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+/* SETUP */
+.setup-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 5px 0; border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  transition: opacity .2s;
+}
+
+.setup-item.off { opacity: .25; }
+
+.setup-item:last-child {
+  border-bottom: none; border-top: 1px solid var(--border2);
+  padding-top: 8px; margin-top: 3px;
+  font-weight: 600; font-size: 12px;
+}
+
+.setup-item .s-name { color: var(--muted2); }
+.setup-item .s-val { font-family: var(--font-mono); color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* ── OUTPUTS ── */
+.outputs-panel { padding: 2rem 2rem 3rem; overflow-y: auto; }
+
+/* METRIC CARDS */
+.metrics-row {
+  display: grid; grid-template-columns: repeat(4,1fr);
+  gap: 10px; margin-bottom: 2rem;
+}
+
+.metric-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px; padding: 1.1rem 1rem;
+  position: relative; overflow: hidden;
+  transition: border-color .2s, transform .2s;
+}
+
+.metric-card:hover { border-color: var(--border2); transform: translateY(-1px); }
+
+.metric-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: .7;
+}
+
+.m-label {
+  font-family: var(--font-mono);
+  font-size: 9px; letter-spacing: .15em;
+  text-transform: uppercase; color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.m-val {
+  font-family: var(--font-display);
+  font-size: 26px; letter-spacing: .03em;
+  color: var(--text); font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.m-sub { font-size: 10px; color: var(--muted); margin-top: 5px; }
+
+/* SCENARIO CARDS */
+.scenarios-grid {
+  display: grid; grid-template-columns: repeat(3,1fr);
+  gap: 14px; margin-bottom: 2rem;
+}
+
+.scenario-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px; overflow: hidden;
+  transition: transform .25s, box-shadow .25s;
+}
+
+.scenario-card:hover {
+  transform: translateY(-3px);
+}
+
+.scenario-card.min { border-top: 2px solid var(--min-c); }
+.scenario-card.med {
+  border: 1px solid rgba(124,109,250,0.4);
+  border-top: 2px solid var(--med-c);
+  box-shadow: 0 0 30px rgba(124,109,250,0.08);
+}
+.scenario-card.max { border-top: 2px solid var(--max-c); }
+
+.sc-head {
+  padding: .85rem 1.1rem .7rem;
+  border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+
+.sc-name {
+  font-family: var(--font-display);
+  font-size: 18px; letter-spacing: .08em;
+}
+
+.scenario-card.min .sc-name { color: var(--min-c); }
+.scenario-card.med .sc-name { color: var(--med-c); }
+.scenario-card.max .sc-name { color: var(--max-c); }
+
+.sc-cr {
+  font-family: var(--font-display);
+  font-size: 26px;
+}
+
+.scenario-card.min .sc-cr { color: var(--min-c); }
+.scenario-card.med .sc-cr { color: var(--med-c); }
+.scenario-card.max .sc-cr { color: var(--max-c); }
+
+.sc-body { padding: .85rem 1.1rem; }
+
+.s-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 11.5px;
+}
+
+.s-row:last-child { border-bottom: none; }
+.s-row .sk { color: var(--muted2); font-weight: 400; }
+.s-row .sv { font-family: var(--font-mono); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+.roi-box {
+  background: var(--surface2);
+  border-radius: 10px; padding: 10px;
+  margin-top: 10px; text-align: center;
+  position: relative; overflow: hidden;
+}
+
+.roi-box::before {
+  content: '';
+  position: absolute; inset: 0;
+  opacity: .05;
+}
+
+.scenario-card.min .roi-box::before { background: var(--min-c); }
+.scenario-card.med .roi-box::before { background: var(--med-c); }
+.scenario-card.max .roi-box::before { background: var(--max-c); }
+
+.roi-lbl {
+  font-family: var(--font-mono);
+  font-size: 8px; letter-spacing: .2em;
+  text-transform: uppercase; color: var(--muted);
+  margin-bottom: 2px;
+}
+
+.roi-num {
+  font-family: var(--font-display);
+  font-size: 36px; letter-spacing: .04em;
+  line-height: 1;
+}
+
+.scenario-card.min .roi-num { color: var(--min-c); text-shadow: 0 0 20px rgba(255,107,107,.3); }
+.scenario-card.med .roi-num { color: var(--med-c); text-shadow: 0 0 20px rgba(124,109,250,.4); }
+.scenario-card.max .roi-num { color: var(--max-c); text-shadow: 0 0 20px rgba(87,255,184,.3); }
+
+/* BARS */
+.bars-section {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 14px; margin-bottom: 2rem;
+}
+
+.bar-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px; padding: 1.1rem;
+}
+
+.bar-card-title {
+  font-family: var(--font-mono);
+  font-size: 9px; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--muted);
+  margin-bottom: 1.1rem;
+}
+
+.bar-item { margin-bottom: 12px; }
+.bar-item:last-child { margin-bottom: 0; }
+
+.bar-meta {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 5px; font-size: 11px;
+}
+
+.b-label { color: var(--muted2); font-weight: 400; }
+.b-val { font-family: var(--font-mono); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+.bar-track {
+  height: 5px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 3px; overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%; border-radius: 3px;
+  transition: width .55s cubic-bezier(.4,0,.2,1);
+}
+
+/* DISABLED STATE for whole scenario */
+.scenario-card.scenario-off {
+  opacity: .2;
+  pointer-events: none;
+  filter: grayscale(1);
+}
+
+/* ── FOOTER ── */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 1rem 2rem;
+  font-family: var(--font-mono);
+  font-size: 10px; color: var(--muted);
+  letter-spacing: .08em;
+  display: flex; justify-content: space-between; align-items: center;
+  position: relative; z-index: 1;
+}
+
+/* ANIMATIONS */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.metric-card { animation: fadeUp .4s ease both; }
+.metric-card:nth-child(1) { animation-delay: .05s; }
+.metric-card:nth-child(2) { animation-delay: .1s; }
+.metric-card:nth-child(3) { animation-delay: .15s; }
+.metric-card:nth-child(4) { animation-delay: .2s; }
+.scenario-card { animation: fadeUp .45s ease both; }
+.scenario-card:nth-child(1) { animation-delay: .2s; }
+.scenario-card:nth-child(2) { animation-delay: .3s; }
+.scenario-card:nth-child(3) { animation-delay: .4s; }
+
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ── MOBILE TAB BAR ── */
+.mob-tabs {
+  display: none;
+  position: fixed; bottom: 0; left: 0; right: 0;
+  z-index: 200;
+  background: rgba(8,8,16,0.97);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border2);
+  padding: 0;
+  height: 56px;
+}
+
+.mob-tabs-inner {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 100%;
+}
+
+.mob-tab {
+  display: flex; align-items: center; justify-content: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 11px; letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  cursor: pointer;
+  border: none; background: transparent;
+  transition: color .2s;
+  padding: 0;
+  border-right: 1px solid var(--border);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mob-tab:last-child { border-right: none; }
+
+.mob-tab.active { color: var(--lime); }
+
+.mob-tab .tab-icon {
+  width: 16px; height: 16px;
+  opacity: .6;
+  transition: opacity .2s;
+}
+
+.mob-tab.active .tab-icon { opacity: 1; }
+
+.mob-tab-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--lime);
+  opacity: 0;
+  transition: opacity .2s;
+  box-shadow: 0 0 6px var(--lime);
+}
+
+.mob-tab.active .mob-tab-dot { opacity: 1; }
+
+/* ── MOBILE BREAKPOINT ── */
+@media (max-width: 768px) {
+
+  /* Header */
+  header { padding: 0 1rem; height: 50px; }
+  .logo { font-size: 18px; }
+
+  /* Hero */
+  .hero { padding: 1.5rem 1rem 1.25rem; }
+  .hero-inner { flex-direction: column; gap: .75rem; align-items: flex-start; }
+  .hero h1 { font-size: clamp(2.8rem, 14vw, 4.5rem); }
+  .hero-meta { text-align: left; }
+  .hero-desc { text-align: left; max-width: 100%; }
+
+  /* Two-panel → single column, tab-switched */
+  .main {
+    display: block;
+    min-height: auto;
+  }
+
+  .inputs-panel {
+    position: static;
+    height: auto;
+    border-right: none;
+    border-bottom: none;
+    padding: 1rem 1rem 2rem;
+    display: none; /* hidden by default, shown by tab */
+    overflow-y: visible;
+  }
+
+  .outputs-panel {
+    padding: 1rem 1rem 5rem; /* extra bottom for tab bar */
+    display: block;
+  }
+
+  /* Show active tab panel */
+  .inputs-panel.mob-active { display: block; }
+  .outputs-panel.mob-active { display: block; }
+
+  /* Show tab bar on mobile */
+  .mob-tabs { display: block; }
+
+  /* Metric cards: 2 columns on mobile */
+  .metrics-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 1.25rem;
+  }
+
+  .m-val { font-size: 20px; }
+
+  /* Scenario cards: full width stacked */
+  .scenarios-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-bottom: 1.25rem;
+  }
+
+  /* Bars: stacked */
+  .bars-section {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  /* Conversion rate boxes */
+  .cr-grid { gap: 6px; }
+  .cr-box input[type=number] { font-size: 17px; }
+
+  /* Section dividers */
+  .sec-head { margin: 1rem 0 .6rem; font-size: 15px; }
+
+  /* Scenario toggles row */
+  .scenario-toggle-row { gap: 6px; }
+
+  /* Footer hidden on mobile (tab bar replaces) */
+  footer { display: none; }
+
+  /* Input names truncate nicely */
+  .input-name { font-size: 11px; }
+  .input-display { min-width: 60px; font-size: 11px; }
+
+  /* Setup cost inputs */
+  .setup-cost-input { width: 60px; font-size: 10px; }
+
+  /* Section sub-headers */
+  .sec-divider {
+    font-size: 9px;
+    padding: 0;
+    margin-bottom: .75rem;
+  }
+}
+
+/* ── SMALL MOBILE ── */
+@media (max-width: 400px) {
+  .hero h1 { font-size: clamp(2.5rem, 16vw, 3.5rem); }
+  .metrics-row { gap: 6px; }
+  .m-val { font-size: 18px; }
+  .cr-box input[type=number] { font-size: 15px; }
+  .roi-num { font-size: 30px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><span class="logo-badge">ROI</span> DYNAMIC MODEL</div>
+  <div class="header-right">
+    <span class="live-dot">LIVE CALC</span>
+  </div>
+</header>
+
+<!-- Mobile tab bar -->
+<div class="mob-tabs">
+  <div class="mob-tabs-inner">
+    <button class="mob-tab" id="tab-inputs" onclick="switchTab('inputs')">
+      <svg class="tab-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="2" y="3" width="12" height="2" rx="1"/><rect x="2" y="7" width="9" height="2" rx="1"/><rect x="2" y="11" width="11" height="2" rx="1"/>
+      </svg>
+      <div class="mob-tab-dot"></div>
+      Inputs
+    </button>
+    <button class="mob-tab active" id="tab-outputs" onclick="switchTab('outputs')">
+      <svg class="tab-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M2 12 L5 8 L8 10 L11 5 L14 7"/><circle cx="14" cy="7" r="1.2" fill="currentColor" stroke="none"/>
+      </svg>
+      <div class="mob-tab-dot"></div>
+      Outputs
+    </button>
+  </div>
+</div>
+
+<div class="hero">
+  <div class="hero-inner">
+    <h1>DYNAMIC<br><em>ROI</em><br>MODEL</h1>
+    <div class="hero-meta">
+      <div class="hero-tag">Farmer Engagement Platform · v2</div>
+      <div class="hero-desc">Toggle inputs on/off to include or exclude them from calculations. All outputs update instantly.</div>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- ── INPUTS ── -->
+  <aside class="inputs-panel" id="panel-inputs">
+
+    <div class="sec-head">Inputs</div>
+
+    <!-- Retailers -->
+    <div class="input-item" id="item_retailers">
+      <div class="input-top">
+        <label class="toggle">
+          <input type="checkbox" id="tog_retailers" checked onchange="toggleInput('retailers')">
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+        <span class="input-name">Retailers mapped</span>
+        <span class="input-display" id="v_retailers">5,000 #</span>
+      </div>
+      <div class="slider-wrap">
+        <input type="range" id="r_retailers" min="1000" max="20000" step="500" value="5000">
+      </div>
+    </div>
+
+    <!-- Fee -->
+    <div class="input-item" id="item_fee">
+      <div class="input-top">
+        <label class="toggle">
+          <input type="checkbox" id="tog_fee" checked onchange="toggleInput('fee')">
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+        <span class="input-name">Retailer fee / month</span>
+        <span class="input-display" id="v_fee">₹149</span>
+      </div>
+      <div class="slider-wrap">
+        <input type="range" id="r_fee" min="50" max="500" step="10" value="149">
+      </div>
+    </div>
+
+    <!-- Months -->
+    <div class="input-item" id="item_months">
+      <div class="input-top">
+        <label class="toggle">
+          <input type="checkbox" id="tog_months" checked onchange="toggleInput('months')">
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+        <span class="input-name">Campaign duration</span>
+        <span class="input-display" id="v_months">6 months</span>
+      </div>
+      <div class="slider-wrap">
+        <input type="range" id="r_months" min="1" max="24" step="1" value="6">
+      </div>
+    </div>
+
+    <!-- Maintenance -->
+    <div class="input-item" id="item_maint">
+      <div class="input-top">
+        <label class="toggle">
+          <input type="checkbox" id="tog_maint" checked onchange="toggleInput('maint')">
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+        <span class="input-name">Maintenance / month</span>
+        <span class="input-display" id="v_maint">₹1,50,000</span>
+      </div>
+      <div class="slider-wrap">
+        <input type="range" id="r_maint" min="50000" max="500000" step="10000" value="150000">
+      </div>
+    </div>
+
+    <!-- Farmers per day -->
+    <div class="input-item" id="item_farmers">
+      <div class="input-top">
+        <label class="toggle">
+          <input type="checkbox" id="tog_farmers" checked onchange="toggleInput('farmers')">
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+        <span class="input-name">Farmers / retailer / day</span>
+        <span class="input-display" id="v_farmers">10 #</span>
+      </div>
+      <div class="slider-wrap">
+        <input type="range" id="r_farmers" min="1" max="50" step="1" value="10">
+      </div>
+    </div>
+
+    <!-- Ticket size -->
+    <div class="input-item" id="item_ticket">
+      <div class="input-top">
+        <label class="toggle">
+          <input type="checkbox" id="tog_ticket" checked onchange="toggleInput('ticket')">
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+        <span class="input-name">Ticket size / purchase</span>
+        <span class="input-display" id="v_ticket">₹1,200</span>
+      </div>
+      <div class="slider-wrap">
+        <input type="range" id="r_ticket" min="200" max="5000" step="100" value="1200">
+      </div>
+    </div>
+
+    <!-- Purchases per farmer -->
+    <div class="input-item" id="item_purchases" style="border-bottom:none">
+      <div class="input-top">
+        <label class="toggle">
+          <input type="checkbox" id="tog_purchases" checked onchange="toggleInput('purchases')">
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+        <span class="input-name">Purchases / converted farmer</span>
+        <span class="input-display" id="v_purchases">1.0x</span>
+      </div>
+      <div class="slider-wrap">
+        <input type="range" id="r_purchases" min="1" max="5" step="0.5" value="1">
+      </div>
+    </div>
+
+    <!-- CONVERSION RATES -->
+    <div class="sec-head">Conversion Scenarios</div>
+    <div class="cr-grid">
+      <div class="cr-box min" id="crbox_min">
+        <label>Minimum</label>
+        <input type="number" id="cr_min" value="8" min="1" max="50">
+        <div class="cr-pct">%</div>
+      </div>
+      <div class="cr-box med" id="crbox_med">
+        <label>Median</label>
+        <input type="number" id="cr_med" value="10" min="1" max="50">
+        <div class="cr-pct">%</div>
+      </div>
+      <div class="cr-box max" id="crbox_max">
+        <label>Maximum</label>
+        <input type="number" id="cr_max" value="12" min="1" max="50">
+        <div class="cr-pct">%</div>
+      </div>
+    </div>
+
+    <!-- Scenario toggles -->
+    <div style="display:flex;gap:8px;margin-bottom:1.25rem">
+      <div style="display:flex;align-items:center;gap:6px;flex:1;background:var(--surface2);border:1px solid rgba(255,107,107,0.2);border-radius:7px;padding:6px 8px">
+        <label class="toggle"><input type="checkbox" id="tog_sc_min" checked onchange="toggleScenario('min')"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        <span style="font-family:var(--font-mono);font-size:10px;color:var(--min-c);letter-spacing:.08em">MIN</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex:1;background:var(--surface2);border:1px solid rgba(124,109,250,0.3);border-radius:7px;padding:6px 8px">
+        <label class="toggle"><input type="checkbox" id="tog_sc_med" checked onchange="toggleScenario('med')"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        <span style="font-family:var(--font-mono);font-size:10px;color:var(--med-c);letter-spacing:.08em">MED</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex:1;background:var(--surface2);border:1px solid rgba(87,255,184,0.2);border-radius:7px;padding:6px 8px">
+        <label class="toggle"><input type="checkbox" id="tog_sc_max" checked onchange="toggleScenario('max')"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        <span style="font-family:var(--font-mono);font-size:10px;color:var(--max-c);letter-spacing:.08em">MAX</span>
+      </div>
+    </div>
+
+    <!-- SETUP COSTS -->
+    <div class="sec-head">Setup Costs</div>
+    <style>
+      .setup-item { display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border); font-size:11px; transition:opacity .2s; }
+      .setup-item.off { opacity:.25; }
+      .setup-item:last-child { border-bottom:none; border-top:1px solid var(--border2); padding-top:8px; margin-top:3px; font-weight:600; font-size:12px; }
+      .setup-left { display:flex; align-items:center; gap:7px; flex:1; min-width:0; }
+      .s-name { color:var(--muted2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .setup-amt-wrap { display:flex; align-items:center; gap:3px; flex-shrink:0; }
+      .setup-amt-wrap span { font-family:var(--font-mono); font-size:10px; color:var(--muted); }
+      .setup-cost-input {
+        background: transparent;
+        border: none;
+        border-bottom: 1px dashed var(--border2);
+        outline: none;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 500;
+        width: 70px;
+        text-align: right;
+        padding: 1px 2px;
+        font-variant-numeric: tabular-nums;
+        transition: border-color .15s, color .15s;
+      }
+      .setup-cost-input:focus {
+        border-bottom-color: var(--accent);
+        color: var(--lime);
+      }
+      .setup-cost-input:hover { border-bottom-color: var(--border2); }
+      .setup-item.off .setup-cost-input { opacity: .4; pointer-events: none; }
+    </style>
+    <div id="setup_section">
+      <div class="setup-item" id="si_whatsapp">
+        <div class="setup-left">
+          <label class="toggle"><input type="checkbox" id="tog_si_whatsapp" checked onchange="toggleSetup('whatsapp')"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+          <span class="s-name">WhatsApp Conversion Flow</span>
+        </div>
+        <div class="setup-amt-wrap"><span>₹</span><input type="number" class="setup-cost-input" id="sc_val_whatsapp" value="120000" min="0" step="1000" oninput="updateSetupCost('whatsapp')"></div>
+      </div>
+      <div class="setup-item" id="si_retail">
+        <div class="setup-left">
+          <label class="toggle"><input type="checkbox" id="tog_si_retail" checked onchange="toggleSetup('retail')"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+          <span class="s-name">Retailer Digitization & Mapping</span>
+        </div>
+        <div class="setup-amt-wrap"><span>₹</span><input type="number" class="setup-cost-input" id="sc_val_retail" value="150000" min="0" step="1000" oninput="updateSetupCost('retail')"></div>
+      </div>
+      <div class="setup-item" id="si_qr">
+        <div class="setup-left">
+          <label class="toggle"><input type="checkbox" id="tog_si_qr" checked onchange="toggleSetup('qr')"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+          <span class="s-name">QR Purchase Tracking</span>
+        </div>
+        <div class="setup-amt-wrap"><span>₹</span><input type="number" class="setup-cost-input" id="sc_val_qr" value="100000" min="0" step="1000" oninput="updateSetupCost('qr')"></div>
+      </div>
+      <div class="setup-item" id="si_dash">
+        <div class="setup-left">
+          <label class="toggle"><input type="checkbox" id="tog_si_dash" checked onchange="toggleSetup('dash')"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+          <span class="s-name">Dashboard Development</span>
+        </div>
+        <div class="setup-amt-wrap"><span>₹</span><input type="number" class="setup-cost-input" id="sc_val_dash" value="150000" min="0" step="1000" oninput="updateSetupCost('dash')"></div>
+      </div>
+      <div class="setup-item" id="si_farmer">
+        <div class="setup-left">
+          <label class="toggle"><input type="checkbox" id="tog_si_farmer" checked onchange="toggleSetup('farmer')"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+          <span class="s-name">Farmer Profiling Engine</span>
+        </div>
+        <div class="setup-amt-wrap"><span>₹</span><input type="number" class="setup-cost-input" id="sc_val_farmer" value="90000" min="0" step="1000" oninput="updateSetupCost('farmer')"></div>
+      </div>
+      <div class="setup-item" id="si_approval">
+        <div class="setup-left">
+          <label class="toggle"><input type="checkbox" id="tog_si_approval" checked onchange="toggleSetup('approval')"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+          <span class="s-name">Retailer Approval Engine</span>
+        </div>
+        <div class="setup-amt-wrap"><span>₹</span><input type="number" class="setup-cost-input" id="sc_val_approval" value="70000" min="0" step="1000" oninput="updateSetupCost('approval')"></div>
+      </div>
+      <div class="setup-item" id="si_campaign">
+        <div class="setup-left">
+          <label class="toggle"><input type="checkbox" id="tog_si_campaign" checked onchange="toggleSetup('campaign')"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+          <span class="s-name">Campaign Config Engine</span>
+        </div>
+        <div class="setup-amt-wrap"><span>₹</span><input type="number" class="setup-cost-input" id="sc_val_campaign" value="70000" min="0" step="1000" oninput="updateSetupCost('campaign')"></div>
+      </div>
+      <div class="setup-item" id="si_integration">
+        <div class="setup-left">
+          <label class="toggle"><input type="checkbox" id="tog_si_integration" checked onchange="toggleSetup('integration')"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+          <span class="s-name">Integration & Testing</span>
+        </div>
+        <div class="setup-amt-wrap"><span>₹</span><input type="number" class="setup-cost-input" id="sc_val_integration" value="80000" min="0" step="1000" oninput="updateSetupCost('integration')"></div>
+      </div>
+      <div class="setup-item" id="si_pm">
+        <div class="setup-left">
+          <label class="toggle"><input type="checkbox" id="tog_si_pm" checked onchange="toggleSetup('pm')"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+          <span class="s-name">PM & Deployment</span>
+        </div>
+        <div class="setup-amt-wrap"><span>₹</span><input type="number" class="setup-cost-input" id="sc_val_pm" value="70000" min="0" step="1000" oninput="updateSetupCost('pm')"></div>
+      </div>
+      <div class="setup-item" style="pointer-events:none">
+        <span class="s-name" style="color:var(--lime);font-weight:600">Total active setup</span>
+        <span style="font-family:var(--font-mono);font-size:12px;color:var(--lime);font-weight:600" id="sv_total_setup">₹9,00,000</span>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ── OUTPUTS ── -->
+  <main class="outputs-panel" id="panel-outputs">
+
+    <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:1rem;display:flex;align-items:center;gap:8px">
+      Investment Summary
+      <span style="flex:1;height:1px;background:linear-gradient(90deg,var(--border2),transparent)"></span>
+    </div>
+
+    <div class="metrics-row">
+      <div class="metric-card"><div class="m-label">Total Investment</div><div class="m-val" id="o_totalinv">₹62.7L</div><div class="m-sub">licensing + maintenance + setup</div></div>
+      <div class="metric-card"><div class="m-label">Per Retailer</div><div class="m-val" id="o_perretailer">₹1,254</div><div class="m-sub">full campaign term</div></div>
+      <div class="metric-card"><div class="m-label">Licensing Total</div><div class="m-val" id="o_licensing">₹44.7L</div><div class="m-sub">retailers × fee × months</div></div>
+      <div class="metric-card"><div class="m-label">Farmers Engaged</div><div class="m-val" id="o_farmers">90L</div><div class="m-sub">total touchpoints</div></div>
+    </div>
+
+    <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:1rem;display:flex;align-items:center;gap:8px">
+      Revenue Scenarios
+      <span style="flex:1;height:1px;background:linear-gradient(90deg,var(--border2),transparent)"></span>
+    </div>
+
+    <div class="scenarios-grid">
+      <div class="scenario-card min" id="sc_card_min">
+        <div class="sc-head"><span class="sc-name">MINIMUM</span><span class="sc-cr" id="sc_cr_min">8%</span></div>
+        <div class="sc-body">
+          <div class="s-row"><span class="sk">Converted farmers</span><span class="sv" id="sc_cf_min">7.2L</span></div>
+          <div class="s-row"><span class="sk">Verified purchases</span><span class="sv" id="sc_vp_min">7.2L</span></div>
+          <div class="s-row"><span class="sk">Revenue generated</span><span class="sv" id="sc_rev_min">₹86.4Cr</span></div>
+          <div class="s-row"><span class="sk">Cost / purchase</span><span class="sv" id="sc_cpp_min">₹8.7</span></div>
+          <div class="s-row"><span class="sk">Net revenue</span><span class="sv" id="sc_net_min">₹85.8Cr</span></div>
+          <div class="roi-box"><div class="roi-lbl">ROI Multiple</div><div class="roi-num" id="sc_roi_min">137.8x</div></div>
+        </div>
+      </div>
+      <div class="scenario-card med" id="sc_card_med">
+        <div class="sc-head"><span class="sc-name">MEDIAN</span><span class="sc-cr" id="sc_cr_med">10%</span></div>
+        <div class="sc-body">
+          <div class="s-row"><span class="sk">Converted farmers</span><span class="sv" id="sc_cf_med">9.0L</span></div>
+          <div class="s-row"><span class="sk">Verified purchases</span><span class="sv" id="sc_vp_med">9.0L</span></div>
+          <div class="s-row"><span class="sk">Revenue generated</span><span class="sv" id="sc_rev_med">₹108Cr</span></div>
+          <div class="s-row"><span class="sk">Cost / purchase</span><span class="sv" id="sc_cpp_med">₹7.0</span></div>
+          <div class="s-row"><span class="sk">Net revenue</span><span class="sv" id="sc_net_med">₹107.4Cr</span></div>
+          <div class="roi-box"><div class="roi-lbl">ROI Multiple</div><div class="roi-num" id="sc_roi_med">172.2x</div></div>
+        </div>
+      </div>
+      <div class="scenario-card max" id="sc_card_max">
+        <div class="sc-head"><span class="sc-name">MAXIMUM</span><span class="sc-cr" id="sc_cr_max">12%</span></div>
+        <div class="sc-body">
+          <div class="s-row"><span class="sk">Converted farmers</span><span class="sv" id="sc_cf_max">10.8L</span></div>
+          <div class="s-row"><span class="sk">Verified purchases</span><span class="sv" id="sc_vp_max">10.8L</span></div>
+          <div class="s-row"><span class="sk">Revenue generated</span><span class="sv" id="sc_rev_max">₹129.6Cr</span></div>
+          <div class="s-row"><span class="sk">Cost / purchase</span><span class="sv" id="sc_cpp_max">₹5.8</span></div>
+          <div class="s-row"><span class="sk">Net revenue</span><span class="sv" id="sc_net_max">₹129Cr</span></div>
+          <div class="roi-box"><div class="roi-lbl">ROI Multiple</div><div class="roi-num" id="sc_roi_max">206.7x</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:1rem;display:flex;align-items:center;gap:8px">
+      Visual Comparison
+      <span style="flex:1;height:1px;background:linear-gradient(90deg,var(--border2),transparent)"></span>
+    </div>
+
+    <div class="bars-section">
+      <div class="bar-card">
+        <div class="bar-card-title">ROI Multiple</div>
+        <div class="bar-item">
+          <div class="bar-meta"><span class="b-label">Minimum</span><span class="b-val" style="color:var(--min-c)" id="b_roi_min">137.8x</span></div>
+          <div class="bar-track"><div class="bar-fill" id="bf_roi_min" style="background:var(--min-c);width:66%"></div></div>
+        </div>
+        <div class="bar-item">
+          <div class="bar-meta"><span class="b-label">Median</span><span class="b-val" style="color:var(--med-c)" id="b_roi_med">172.2x</span></div>
+          <div class="bar-track"><div class="bar-fill" id="bf_roi_med" style="background:var(--med-c);width:83%"></div></div>
+        </div>
+        <div class="bar-item">
+          <div class="bar-meta"><span class="b-label">Maximum</span><span class="b-val" style="color:var(--max-c)" id="b_roi_max">206.7x</span></div>
+          <div class="bar-track"><div class="bar-fill" id="bf_roi_max" style="background:var(--max-c);width:100%"></div></div>
+        </div>
+      </div>
+      <div class="bar-card">
+        <div class="bar-card-title">Net Revenue After Investment</div>
+        <div class="bar-item">
+          <div class="bar-meta"><span class="b-label">Minimum</span><span class="b-val" style="color:var(--min-c)" id="b_net_min">₹85.8Cr</span></div>
+          <div class="bar-track"><div class="bar-fill" id="bf_net_min" style="background:var(--min-c);width:66%"></div></div>
+        </div>
+        <div class="bar-item">
+          <div class="bar-meta"><span class="b-label">Median</span><span class="b-val" style="color:var(--med-c)" id="b_net_med">₹107.4Cr</span></div>
+          <div class="bar-track"><div class="bar-fill" id="bf_net_med" style="background:var(--med-c);width:83%"></div></div>
+        </div>
+        <div class="bar-item">
+          <div class="bar-meta"><span class="b-label">Maximum</span><span class="b-val" style="color:var(--max-c)" id="b_net_max">₹129Cr</span></div>
+          <div class="bar-track"><div class="bar-fill" id="bf_net_max" style="background:var(--max-c);width:100%"></div></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<footer>
+  <span>DYNAMIC ROI MODEL V2</span>
+  <span>ALL OUTPUTS FORMULA-DRIVEN · TOGGLE TO INCLUDE / EXCLUDE</span>
+</footer>
+
+<script>
+const DEFAULTS = {
+  retailers: 5000, fee: 149, months: 6,
+  maint: 150000, farmers: 10, ticket: 1200, purchases: 1
+};
+
+const setupKeys = ['whatsapp','retail','qr','dash','farmer','approval','campaign','integration','pm'];
+const setupActive = {};
+setupKeys.forEach(k => setupActive[k] = true);
+
+// Read live cost from editable input
+function getSetupCost(key) {
+  return Math.max(0, +document.getElementById('sc_val_' + key).value || 0);
+}
+
+const sliders = [
+  {r:'r_retailers', v:'v_retailers', key:'retailers', fmt: x=>`${Math.round(x).toLocaleString('en-IN')} #`},
+  {r:'r_fee',       v:'v_fee',       key:'fee',       fmt: x=>`₹${Math.round(x).toLocaleString('en-IN')}`},
+  {r:'r_months',    v:'v_months',    key:'months',    fmt: x=>`${x} months`},
+  {r:'r_maint',     v:'v_maint',     key:'maint',     fmt: x=>`₹${Math.round(x).toLocaleString('en-IN')}`},
+  {r:'r_farmers',   v:'v_farmers',   key:'farmers',   fmt: x=>`${x} #`},
+  {r:'r_ticket',    v:'v_ticket',    key:'ticket',    fmt: x=>`₹${Math.round(x).toLocaleString('en-IN')}`},
+  {r:'r_purchases', v:'v_purchases', key:'purchases', fmt: x=>`${parseFloat(x).toFixed(1)}x`},
+];
+
+sliders.forEach(({r, v, fmt}) => {
+  const el = document.getElementById(r);
+  const disp = document.getElementById(v);
+  el.addEventListener('input', () => { disp.textContent = fmt(el.value); calc(); });
+});
+
+['cr_min','cr_med','cr_max'].forEach(id => {
+  document.getElementById(id).addEventListener('input', calc);
+});
+
+function updateSetupCost(key) { calc(); }
+
+function toggleInput(key) {
+  const on = document.getElementById('tog_' + key).checked;
+  document.getElementById('item_' + key).classList.toggle('off', !on);
+  calc();
+}
+
+function toggleScenario(sc) {
+  const on = document.getElementById('tog_sc_' + sc).checked;
+  document.getElementById('sc_card_' + sc).classList.toggle('scenario-off', !on);
+  document.getElementById('crbox_' + sc).classList.toggle('off', !on);
+  calc();
+}
+
+function toggleSetup(key) {
+  const on = document.getElementById('tog_si_' + key).checked;
+  setupActive[key] = on;
+  document.getElementById('si_' + key).classList.toggle('off', !on);
+  calc();
+}
+
+function fmtInr(n) {
+  if (n >= 10000000) return '₹' + (Math.round(n/100000)/10).toFixed(1) + 'Cr';
+  if (n >= 100000)   return '₹' + (Math.round(n/10000)/10).toFixed(1) + 'L';
+  return '₹' + Math.round(n).toLocaleString('en-IN');
+}
+
+function fmtCount(n) {
+  if (n >= 10000000) return (Math.round(n/100000)/10).toFixed(1) + 'Cr';
+  if (n >= 100000)   return (Math.round(n/10000)/10).toFixed(1) + 'L';
+  return Math.round(n).toLocaleString('en-IN');
+}
+
+function setVal(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }
+
+function getVal(key) {
+  const tog = document.getElementById('tog_' + key);
+  if (tog && !tog.checked) return DEFAULTS[key];
+  return +document.getElementById('r_' + key).value;
+}
+
+function calc() {
+  const retailers = getVal('retailers');
+  const fee       = getVal('fee');
+  const months    = getVal('months');
+  const maint     = getVal('maint');
+  const fpd       = getVal('farmers');
+  const ticket    = getVal('ticket');
+  const purchases = getVal('purchases');
+
+  // Sum only active setup costs (from editable inputs)
+  const activeSetup = setupKeys
+    .filter(k => setupActive[k])
+    .reduce((s, k) => s + getSetupCost(k), 0);
+
+  setVal('sv_total_setup', fmtInr(activeSetup));
+
+  const licensing     = retailers * fee * months;
+  const maintenance   = maint * months;
+  const total_inv     = licensing + maintenance + activeSetup;
+  const campaign_days = months * 30;
+  const total_farmers = retailers * fpd * campaign_days;
+  const per_retailer  = retailers > 0 ? total_inv / retailers : 0;
+
+  setVal('o_totalinv',    fmtInr(total_inv));
+  setVal('o_perretailer', '₹' + Math.round(per_retailer).toLocaleString('en-IN'));
+  setVal('o_licensing',   fmtInr(licensing));
+  setVal('o_farmers',     fmtCount(total_farmers));
+
+  const cr_vals = ['cr_min','cr_med','cr_max'].map(id => +document.getElementById(id).value / 100);
+  const cr_disp = ['cr_min','cr_med','cr_max'].map(id => document.getElementById(id).value);
+  const labels  = ['min','med','max'];
+  const rois = [], nets = [];
+
+  labels.forEach((l, i) => {
+    const scOn    = document.getElementById('tog_sc_' + l).checked;
+    const cr      = cr_vals[i];
+    const converted = total_farmers * cr;
+    const verified  = converted * purchases;
+    const revenue   = verified * ticket;
+    const roi       = total_inv > 0 ? revenue / total_inv : 0;
+    const net       = revenue - total_inv;
+    const cpp       = verified > 0 ? total_inv / verified : 0;
+
+    rois.push(scOn ? roi : 0);
+    nets.push(scOn ? Math.max(0, net) : 0);
+
+    setVal(`sc_cr_${l}`,  cr_disp[i] + '%');
+    setVal(`sc_cf_${l}`,  fmtCount(converted));
+    setVal(`sc_vp_${l}`,  fmtCount(verified));
+    setVal(`sc_rev_${l}`, fmtInr(revenue));
+    setVal(`sc_cpp_${l}`, '₹' + cpp.toFixed(1));
+    setVal(`sc_net_${l}`, fmtInr(net));
+    setVal(`sc_roi_${l}`, roi.toFixed(1) + 'x');
+    setVal(`b_roi_${l}`,  roi.toFixed(1) + 'x');
+    setVal(`b_net_${l}`,  fmtInr(net));
+  });
+
+  const maxRoi = Math.max(...rois, 1);
+  const maxNet = Math.max(...nets, 1);
+
+  labels.forEach((l, i) => {
+    const rf = document.getElementById(`bf_roi_${l}`);
+    const nf = document.getElementById(`bf_net_${l}`);
+    if (rf) rf.style.width = (rois[i] / maxRoi * 100).toFixed(1) + '%';
+    if (nf) nf.style.width = (nets[i] / maxNet * 100).toFixed(1) + '%';
+  });
+}
+
+calc();
+
+// ── MOBILE TAB SWITCHER ──
+function switchTab(tab) {
+  const isMobile = window.innerWidth <= 768;
+  if (!isMobile) return;
+
+  const panels = { inputs: document.getElementById('panel-inputs'), outputs: document.getElementById('panel-outputs') };
+  const tabs   = { inputs: document.getElementById('tab-inputs'),   outputs: document.getElementById('tab-outputs') };
+
+  Object.keys(panels).forEach(k => {
+    panels[k].classList.toggle('mob-active', k === tab);
+    tabs[k].classList.toggle('active', k === tab);
+  });
+}
+
+function initMobile() {
+  if (window.innerWidth <= 768) {
+    // Default: show outputs tab
+    document.getElementById('panel-outputs').classList.add('mob-active');
+    document.getElementById('tab-outputs').classList.add('active');
+    document.getElementById('tab-inputs').classList.remove('active');
+  } else {
+    // Desktop: remove mob-active so CSS shows both
+    document.getElementById('panel-inputs').classList.remove('mob-active');
+    document.getElementById('panel-outputs').classList.remove('mob-active');
+  }
+}
+
+initMobile();
+window.addEventListener('resize', initMobile);
+
+</body>
+</html>
