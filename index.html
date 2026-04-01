@@ -1132,11 +1132,6 @@ footer {
 </footer>
 
 <script>
-const DEFAULTS = {
-  retailers: 5000, fee: 149, months: 6,
-  maint: 150000, farmers: 10, ticket: 1200, purchases: 1
-};
-
 const setupKeys = ['whatsapp','retail','qr','dash','farmer','approval','campaign','integration','pm'];
 const setupActive = {};
 setupKeys.forEach(k => setupActive[k] = true);
@@ -1170,7 +1165,11 @@ function updateSetupCost(key) { calc(); }
 
 function toggleInput(key) {
   const on = document.getElementById('tog_' + key).checked;
-  document.getElementById('item_' + key).classList.toggle('off', !on);
+  const item = document.getElementById('item_' + key);
+  item.classList.toggle('off', !on);
+  // Lock or unlock the slider
+  const slider = document.getElementById('r_' + key);
+  if (slider) slider.disabled = !on;
   calc();
 }
 
@@ -1203,8 +1202,7 @@ function fmtCount(n) {
 function setVal(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }
 
 function getVal(key) {
-  const tog = document.getElementById('tog_' + key);
-  if (tog && !tog.checked) return DEFAULTS[key];
+  // Always use the real slider value — toggle locks the slider visually but never overrides the value
   return +document.getElementById('r_' + key).value;
 }
 
@@ -1308,5 +1306,6 @@ function initMobile() {
 initMobile();
 window.addEventListener('resize', initMobile);
 
+</script>
 </body>
 </html>
