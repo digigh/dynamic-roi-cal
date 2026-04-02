@@ -289,7 +289,7 @@ footer{border-top:1px solid var(--border);padding:.85rem 1.5rem;font-family:var(
 <!-- Desktop nav tabs -->
 <div class="nav-tabs">
   <button class="nav-tab active" onclick="showPage('calculator')">Calculator</button>
-  <button class="nav-tab" onclick="showPage('explainer')"></button>
+  <button class="nav-tab" onclick="showPage('explainer')">How It Works</button>
 </div>
 
 <!-- Mobile bottom bar -->
@@ -310,8 +310,8 @@ footer{border-top:1px solid var(--border);padding:.85rem 1.5rem;font-family:var(
     <div class="hero-inner">
       <h1>DYNAMIC<br><em>ROI</em><br>PLATFORM</h1>
       <div class="hero-right">
-        <div class="hero-tag"></div>
-        <div class="hero-desc"></div>
+        <div class="hero-tag">Farmer Engagement · v5</div>
+        <div class="hero-desc">Every output mirrors the exact Excel formulas. Toggle inputs, edit values — all 13 calculations update live.</div>
       </div>
     </div>
   </div>
@@ -334,16 +334,58 @@ footer{border-top:1px solid var(--border);padding:.85rem 1.5rem;font-family:var(
         <div class="inp-formula">Used in: Monthly licensing · Total farmers engaged</div>
       </div>
 
-      <!-- FEE -->
+      <!-- FEE — smart tier + custom override -->
       <div class="inp-item" id="item_fee">
         <div class="inp-top">
           <label class="toggle"><input type="checkbox" id="tog_fee" checked onchange="toggleInp('fee')"><div class="tt"></div><div class="th"></div></label>
           <span class="inp-name">Retailer fee / month (₹)</span>
           <span class="inp-val" id="v_fee">₹149</span>
         </div>
-        <div class="sw"><input type="range" id="r_fee" min="50" max="500" step="5" value="149"></div>
-        <div class="inp-formula">Formula: Retailers × Fee × Months → Licensing total</div>
+
+        <!-- Tier pills -->
+        <div id="fee-tier-row" style="display:flex;gap:5px;margin:5px 0 6px;flex-wrap:wrap">
+          <div class="fee-tier-pill active" id="tier-pill-0" onclick="selectFeeTier(0)">
+            <span class="ftp-range">&lt; 10,000</span>
+            <span class="ftp-val">₹149</span>
+          </div>
+          <div class="fee-tier-pill" id="tier-pill-1" onclick="selectFeeTier(1)">
+            <span class="ftp-range">≥ 10,000</span>
+            <span class="ftp-val">₹99</span>
+          </div>
+          <div class="fee-tier-pill" id="tier-pill-custom" onclick="selectFeeTier('custom')">
+            <span class="ftp-range">Custom</span>
+            <span class="ftp-val" id="ftp-custom-val">—</span>
+          </div>
+        </div>
+
+        <!-- Custom override row (shown only in custom mode) -->
+        <div id="fee-custom-row" style="display:none;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="font-family:var(--fm);font-size:10px;color:var(--muted)">Custom fee ₹</span>
+          <input type="number" id="fee-custom-input" value="149" min="1" max="9999" step="1"
+            style="background:var(--surface2);border:1px solid var(--border2);border-radius:6px;outline:none;color:var(--lime);font-family:var(--fm);font-size:14px;font-weight:700;width:80px;text-align:center;padding:4px 6px;transition:border-color .15s"
+            oninput="onCustomFeeInput()">
+          <span style="font-family:var(--fm);font-size:9px;color:var(--muted)">/mo per retailer</span>
+        </div>
+
+        <!-- Hidden range input still used as the value source for getInp('fee') -->
+        <input type="range" id="r_fee" min="1" max="9999" step="1" value="149" style="display:none">
+        <div class="inp-formula" id="fee-formula-hint">Auto-set: &lt;10,000 retailers → ₹149 · ≥10,000 → ₹99</div>
       </div>
+
+      <style>
+        .fee-tier-pill {
+          display:flex;flex-direction:column;align-items:center;
+          background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+          padding:5px 10px;cursor:pointer;transition:border-color .2s,background .2s;min-width:62px;
+        }
+        .fee-tier-pill:hover { border-color:var(--border2); }
+        .fee-tier-pill.active { border-color:var(--accent);background:rgba(124,109,250,.12); }
+        .fee-tier-pill.active .ftp-val { color:var(--lime); }
+        .ftp-range { font-family:var(--fm);font-size:8px;color:var(--muted);letter-spacing:.05em;margin-bottom:2px; }
+        .ftp-val   { font-family:var(--fm);font-size:13px;font-weight:700;color:var(--muted2); }
+        #fee-custom-input:focus { border-color:var(--accent); }
+        .inp-item.off #fee-tier-row,.inp-item.off #fee-custom-row { pointer-events:none;opacity:.4; }
+      </style>
 
       <!-- MONTHS -->
       <div class="inp-item" id="item_months">
@@ -735,8 +777,8 @@ footer{border-top:1px solid var(--border);padding:.85rem 1.5rem;font-family:var(
 </div>
 
 <footer>
-  <span></span>
-  <span></span>
+  <span>DYNAMIC ROI PLATFORM V5 · FORMULA-FAITHFUL</span>
+  <span>13 LIVE FORMULAS · 3 SCENARIOS · MOBILE READY</span>
 </footer>
 
 <script>
@@ -748,7 +790,6 @@ SETUP_KEYS.forEach(k => setupActive[k] = true);
 // ── SLIDER CONFIG ──
 const SLIDERS = [
   {id:'retailers', disp:'v_retailers', fmt: x=>`${Math.round(x).toLocaleString('en-IN')}`},
-  {id:'fee',       disp:'v_fee',       fmt: x=>`₹${Math.round(x).toLocaleString('en-IN')}`},
   {id:'months',    disp:'v_months',    fmt: x=>`${x} mo`},
   {id:'days',      disp:'v_days',      fmt: x=>`${x}`},
   {id:'maint',     disp:'v_maint',     fmt: x=>`₹${(x/100000).toFixed(1)}L`},
@@ -762,8 +803,97 @@ SLIDERS.forEach(({id, disp, fmt}) => {
   const el = document.getElementById('r_' + id);
   const dp = document.getElementById(disp);
   if (!el || !dp) return;
-  el.addEventListener('input', () => { dp.textContent = fmt(el.value); calc(); });
+  el.addEventListener('input', () => {
+    dp.textContent = fmt(el.value);
+    if (id === 'retailers') autoUpdateFeeTier(); // auto-tier on retailers change
+    calc();
+  });
 });
+
+// ── FEE TIER LOGIC ──
+// Tiers: 0 = <10000 → ₹149, 1 = ≥10000 → ₹99, 'custom' = user-defined
+const FEE_TIERS = [
+  { label: '<10K',  fee: 149 },
+  { label: '≥10K',  fee: 99  },
+];
+let feeMode = 'auto'; // 'auto' | 'custom'
+let customFeeValue = 149;
+
+function getAutoTierFee(retailers) {
+  if (retailers < 10000) return { idx: 0, fee: 149 };
+  return { idx: 1, fee: 99 };
+}
+
+function setFeeValue(fee) {
+  const r = document.getElementById('r_fee');
+  const v = document.getElementById('v_fee');
+  if (r) r.value = fee;
+  if (v) v.textContent = '₹' + fee;
+}
+
+function autoUpdateFeeTier() {
+  if (feeMode === 'custom') return; // don't auto-override when user has customised
+  const retailers = getInp('retailers');
+  const { idx, fee } = getAutoTierFee(retailers);
+  setFeeValue(fee);
+  // update pill highlights
+  ['0','1','custom'].forEach(k => {
+    const p = document.getElementById('tier-pill-' + k);
+    if (p) p.classList.toggle('active', String(idx) === k);
+  });
+  document.getElementById('tier-pill-custom').classList.remove('active');
+  updateFeeHint(fee, retailers);
+}
+
+function selectFeeTier(idx) {
+  if (idx === 'custom') {
+    feeMode = 'custom';
+    // show custom input, hide auto hint
+    document.getElementById('fee-custom-row').style.display = 'flex';
+    document.getElementById('fee-formula-hint').style.display = 'none';
+    // set pill highlights
+    ['0','1'].forEach(k => document.getElementById('tier-pill-' + k).classList.remove('active'));
+    document.getElementById('tier-pill-custom').classList.add('active');
+    // sync custom input to current fee
+    const cur = +document.getElementById('r_fee').value;
+    document.getElementById('fee-custom-input').value = cur;
+    document.getElementById('ftp-custom-val').textContent = '₹' + cur;
+    setFeeValue(cur);
+    calc();
+    return;
+  }
+  // Auto tier selected — lock mode back to auto
+  feeMode = 'auto';
+  document.getElementById('fee-custom-row').style.display = 'none';
+  document.getElementById('fee-formula-hint').style.display = 'block';
+  const fee = FEE_TIERS[idx].fee;
+  setFeeValue(fee);
+  ['0','1','custom'].forEach(k => {
+    document.getElementById('tier-pill-' + k).classList.toggle('active', String(k) === String(idx));
+  });
+  document.getElementById('tier-pill-custom').classList.remove('active');
+  const retailers = getInp('retailers');
+  updateFeeHint(fee, retailers);
+  calc();
+}
+
+function onCustomFeeInput() {
+  const val = Math.max(1, +document.getElementById('fee-custom-input').value || 1);
+  customFeeValue = val;
+  setFeeValue(val);
+  document.getElementById('ftp-custom-val').textContent = '₹' + val;
+  calc();
+}
+
+function updateFeeHint(fee, retailers) {
+  const hint = document.getElementById('fee-formula-hint');
+  if (!hint) return;
+  if (retailers < 10000) {
+    hint.textContent = 'Auto: ' + retailers.toLocaleString('en-IN') + ' retailers < 10,000 → ₹149/mo';
+  } else {
+    hint.textContent = 'Auto: ' + retailers.toLocaleString('en-IN') + ' retailers ≥ 10,000 → ₹99/mo';
+  }
+}
 
 // Wire CR inputs
 ['cr_min','cr_med','cr_max'].forEach(id => {
@@ -1019,6 +1149,7 @@ function initMobile() {
 }
 
 // ── INIT ──
+autoUpdateFeeTier(); // set initial tier based on default retailers value
 calc();
 initMobile();
 window.addEventListener('resize', initMobile);
